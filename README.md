@@ -220,10 +220,15 @@ docker load -i mylife-finance-mcp_1.2.3-linux-amd64.tar.gz
 - 启用 WAL（`journal_mode=WAL` + `busy_timeout=5000`），MCP 服务与工作台可并发同一库。
 - `node scripts/reset-data.mjs --dry-run` 先看将删行数，`--yes` 执行（自动 `VACUUM INTO` 备份，重播 137 个内置分类）。
 
+## 10 许可
+
+[MIT](LICENSE) © 2026 Zheny918。可自由使用、修改、商用与再分发，保留版权声明即可。
+
 ## 文件结构
 
 ```
 mylife-finance-skill/
+├── LICENSE                      # MIT
 ├── server.js / server-http.js   # MCP stdio / Streamable HTTP 入口
 ├── workbench.js                 # 本地工作台（3457，免登录）
 ├── SKILL.md                     # WorkBuddy 技能（副本在 ~/.workbuddy/skills/）
