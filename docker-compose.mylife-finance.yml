@@ -1,0 +1,68 @@
+# Finance MCP Server — Docker Compose（配合 Octop 使用）
+#
+# 用法一：与本文件同目录执行
+#   docker network ls | grep octop          # 先确认 Octop 的 network 名，默认 octop_default
+#   OCTOP_NETWORK=octop_default docker compose -f docker-compose.mylife-finance.yml up -d --build
+#
+# 用法二：直接把 services 下面这段粘进 Octop 自己的 docker-compose.yml，
+#        这样自动同网络，连 OCTOP_NETWORK 都不用手动指定。
+#
+# 起来后，在 Octop 控制台「连接器 → 添加自定义 MCP」里填：
+#   URL: http://mylife-finance-mcp:3458/mcp/<用户名>
+#   例如 http://mylife-finance-mcp:3458/mcp/alice
+# 用户名就是数据隔离的边界，每个家庭成员/同事填自己的。
+
+services:
+  mylife-finance-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # 标签与 package.json 版本保持一致；换标签可用 MYLF_IMAGE 覆盖
+    image: ${MYLF_IMAGE:-mylife-finance-mcp:1.2.3}
+    container_name: mylife-finance-mcp
+    restart: unless-stopped
+    environment:
+      MYLF_DATA_DIR: /data
+      MYLF_HTTP_PORT: "3458"
+      MYLF_HTTP_HOST: 0.0.0.0
+      # ★ 对外基址：把看板路径拼成可点击 URL 返回给模型。不设的话 dashboard_build 只返回容器内路径，
+      #   Octop / 浏览器都打不开。填你实际访问 MCP 用的那个地址（带端口，不带结尾斜杠）
+      MYLF_PUBLIC_BASE_URL: "http://192.168.130.8:3458"
+      # 内网可不开；若容器网络不可信，打开并与 Octop 侧的 Authorization 保持一致
+      # MYLF_HTTP_TOKEN: "换成一个长随机串"
+      # 设 0 关闭「新用户首次访问自动开通租户 + 播种默认分类」
+      # MYLF_HTTP_AUTO_TENANT: "0"
+    volumes:
+      - mylife-finance-data:/data
+    networks:
+      octop_net:
+        # ★ Octop 的 URL 校验器只放行「私网 IP / localhost / .local / .internal / *.docker.internal」，
+        #   纯容器名会被判成公网地址并强制 HTTPS。需要容器名直连时打开下面的别名，
+        #   然后把连接器 URL 写成 http://mylife-finance-mcp.internal:3458/mcp/<用户名>
+        aliases:
+          - mylife-finance-mcp.internal
+    ports:
+      # 默认只绑回环，供宿主机 curl /health 调试；容器间访问走服务名，不经过这里
+      - "127.0.0.1:3458:3458"
+      # 要让局域网里的另一台 WorkBuddy 也能接（共用同一本账），改成下面这行：
+      #   - "3458:3458"
+      # ⚠️ 开放前务必设置上面的 MYLF_HTTP_TOKEN ——
+      #    否则同网段任何人知道地址就能读写任意用户的账本（URL 里的用户名只是分区名，不是凭据）。
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3458/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mylife-finance-data:
+
+networks:
+  octop_net:
+    external: true
+    name: ${OCTOP_NETWORK:-octop_default}

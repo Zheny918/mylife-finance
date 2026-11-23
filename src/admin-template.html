@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>用户管理 · MyLife 财务工作台</title>
+<style>
+  :root { --bg:#f5f7fa; --card:#fff; --text:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+    --accent:#2563eb; --shadow:0 1px 3px rgba(0,0,0,.08); --bad:#dc2626; --ok:#16a34a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; font-size:14px; }
+  .topbar { display:flex; align-items:center; gap:14px; padding:14px 22px; background:var(--card);
+    border-bottom:1px solid var(--line); }
+  .topbar h1 { font-size:18px; margin:0; font-weight:600; }
+  .topbar .who { margin-left:auto; color:var(--muted); font-size:13px; }
+  .topbar a { color:var(--muted); font-size:13px; }
+  .wrap { max-width:1180px; margin:0 auto; padding:22px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:18px; box-shadow:var(--shadow); margin-bottom:16px; }
+  .panel h3 { margin:0 0 14px; font-size:15px; }
+  .panel .hint { color:var(--muted); font-size:12px; margin:-6px 0 14px; line-height:1.6; }
+  label { display:block; font-size:12px; color:var(--muted); margin:0 0 5px; }
+  input, select { padding:8px 10px; border:1px solid var(--line); border-radius:8px;
+    font-size:13px; font-family:inherit; background:#fff; }
+  input:focus, select:focus { outline:none; border-color:var(--accent); }
+  .form-row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+  .form-row > div { display:flex; flex-direction:column; }
+  button { padding:7px 13px; border:1px solid var(--line); border-radius:8px; background:#fff;
+    cursor:pointer; font-size:13px; font-family:inherit; color:var(--text); }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.danger { color:var(--bad); border-color:#fecaca; }
+  button:disabled { opacity:.55; cursor:default; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { color:var(--muted); font-weight:500; }
+  .tag { display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px; background:#eef2ff; color:#3730a3; }
+  .tag.off { background:#fef2f2; color:#b91c1c; }
+  .tag.warn { background:#fffbeb; color:#92400e; }
+  .tag.member { background:#f3f4f6; color:#4b5563; }
+  .muted { color:var(--muted); }
+  .tiny { font-size:11px; color:var(--muted); line-height:1.5; }
+  .cbrow { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted); }
+  .cbrow input { width:15px; height:15px; }
+  .token-box { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px 14px;
+    font-size:13px; margin-top:14px; display:none; }
+  .token-box code { display:block; margin:8px 0; padding:9px 11px; background:#fff; border:1px solid var(--line);
+    border-radius:8px; font-size:13px; word-break:break-all; user-select:all; }
+  .msg { font-size:13px; min-height:20px; margin-top:10px; }
+  .msg.ok { color:var(--ok); } .msg.bad { color:var(--bad); }
+  a { color:var(--accent); text-decoration:none; }
+  .audit td { font-size:12px; padding:6px 8px; }
+  .audit .ev { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; }
+  @media (max-width:860px){ .form-row > div { width:100%; } .form-row input, .form-row select { width:100%; } }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>用户管理</h1>
+  <a href="/">← 回工作台</a>
+  <div class="who" id="who"></div>
+</div>
+<div class="wrap">
+
+  <div class="panel">
+    <h3>新增用户</h3>
+    <p class="hint">用户名会同时作为租户 ID，出现在 Octop 连接器 URL 里：<code>/mcp/&lt;用户名&gt;</code>。
+      密码只用于浏览器登录工作台；Octop 那边用的是 token（创建后只显示一次）。</p>
+    <form id="cf">
+      <div class="form-row">
+        <div><label for="nu">用户名</label>
+          <input id="nu" placeholder="alice" autocapitalize="off" spellcheck="false" required /></div>
+        <div><label for="nl">备注</label><input id="nl" placeholder="老婆 / 自己" /></div>
+        <div><label for="np">初始密码（至少 8 位）</label>
+          <input id="np" type="password" autocomplete="new-password" required minlength="8" /></div>
+        <div><label for="nr">角色</label>
+          <select id="nr"><option value="member">成员</option><option value="admin">管理员</option></select></div>
+        <div><button class="primary" id="cg" type="submit">创建</button></div>
+      </div>
+      <div class="cbrow" style="margin-top:10px">
+        <input type="checkbox" id="nreclaim" />
+        <label for="nreclaim" style="margin:0">接管已删除用户的旧账本（仅在确认是同一人时勾选）</label>
+      </div>
+      <div class="tiny" id="retired-note" style="margin-top:8px; display:none"></div>
+      <div class="msg" id="cmsg"></div>
+    </form>
+    <div class="token-box" id="tbox">
+      <b>新的 MCP token（只显示这一次）</b>
+      <code id="tval"></code>
+      <div class="muted">填到 Octop 连接器的 Headers：<code style="display:inline">Authorization: Bearer &lt;token&gt;</code>，
+        连接器 URL 用 <code style="display:inline">http://mylife-finance-mcp.internal:3458/mcp/&lt;用户名&gt;</code>。
+        不要把 token 写进 URL 的 <code style="display:inline">?token=</code> 里——那会留在反代和 Octop 的访问日志里。</div>
+      <div style="margin-top:8px"><button id="tclose" type="button">我已保存</button></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>用户列表</h3>
+    <table>
+      <thead>
+        <tr><th>用户名</th><th>备注</th><th>角色</th><th>状态</th><th>MCP token</th>
+          <th>最近活动</th><th style="width:300px">操作</th></tr>
+      </thead>
+      <tbody id="rows"><tr><td colspan="7" class="muted">加载中…</td></tr></tbody>
+    </table>
+    <div class="msg" id="lmsg"></div>
+  </div>
+
+  <div class="panel">
+    <h3>最近操作记录</h3>
+    <p class="hint">最近 50 条登录 / 改密 / 用户管理 / 越权拦截。存在容器内 <code>DATA_DIR/audit.log</code>，可直接 <code>docker exec</code> 查看。</p>
+    <table class="audit">
+      <thead><tr><th style="width:150px">时间</th><th style="width:190px">事件</th><th style="width:120px">发起人</th>
+        <th style="width:130px">来源 IP</th><th>细节</th></tr></thead>
+      <tbody id="audit"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="muted">命令行等价操作：<code>docker exec mylife-finance-mcp node src/cli.js list</code></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let ME = null;
+
+async function j(method, path, body) {
+  const r = await fetch(path, {
+    method,
+    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  let d = {};
+  try { d = await r.json(); } catch (e) {}
+  if (r.status === 401) { location.href = '/login'; throw new Error('未登录'); }
+  if (!r.ok || d.ok === false) throw new Error(d.error || ('HTTP ' + r.status));
+  return d;
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function short(t) {
+  if (!t) return '';
+  const s = String(t);
+  return s.slice(0, 16).replace('T', ' ');
+}
+
+function showToken(tok) {
+  $('tval').textContent = tok;
+  $('tbox').style.display = 'block';
+  $('tbox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+$('tclose').addEventListener('click', () => { $('tbox').style.display = 'none'; $('tval').textContent = ''; });
+
+function rowHtml(u) {
+  const role = u.role === 'admin' ? '<span class="tag">管理员</span>' : '<span class="tag member">成员</span>';
+  const st = u.disabled ? '<span class="tag off">已停用</span>' : '<span class="tag" style="background:#ecfdf5;color:#047857">正常</span>';
+  const tok = u.hasToken ? '<span class="muted">已配置</span>' : '<span class="tag off">未配置</span>';
+  const self = ME && ME.userId === u.userId;
+  const s = u.usage || {};
+  const activity =
+    '<div class="tiny">登录 ' + (s.lastLoginAt ? esc(short(s.lastLoginAt)) : '从未') + '</div>' +
+    '<div class="tiny">MCP ' + (s.lastTokenAt ? esc(short(s.lastTokenAt)) : '从未') + '</div>';
+  return `<tr>
+    <td><b>${esc(u.userId)}</b>${self ? ' <span class="muted">(我)</span>' : ''}</td>
+    <td>${esc(u.label) || '<span class="muted">—</span>'}</td>
+    <td>${role}</td>
+    <td>${st}${u.mustChange ? ' <span class="tag warn">待改密</span>' : ''}</td>
+    <td>${tok}</td>
+    <td>${activity}</td>
+    <td>
+      <button data-act="pwd" data-u="${esc(u.userId)}">重置密码</button>
+      <button data-act="tok" data-u="${esc(u.userId)}">轮换 token</button>
+      <button data-act="${u.disabled ? 'enable' : 'disable'}" data-u="${esc(u.userId)}">${u.disabled ? '启用' : '停用'}</button>
+      <button class="danger" data-act="del" data-u="${esc(u.userId)}">删除</button>
+    </td>
+  </tr>`;
+}
+
+async function load() {
+  const d = await j('GET', '/api/admin/users');
+  const rows = d.users || [];
+  $('rows').innerHTML = rows.length
+    ? rows.map(rowHtml).join('')
+    : '<tr><td colspan="7" class="muted">还没有用户</td></tr>';
+  $('rows').querySelectorAll('button[data-act]').forEach((b) => {
+    b.addEventListener('click', () => act(b.dataset.act, b.dataset.u, b));
+  });
+
+  const retired = d.retired || [];
+  const note = $('retired-note');
+  if (retired.length) {
+    note.style.display = 'block';
+    note.innerHTML = '已删除但账本仍在：' + retired
+      .map((r) => '<b>' + esc(r.userId) + '</b>（' + esc(String(r.at || '').slice(0, 10)) + '）').join('、') +
+      '。直接重建同名用户会被拒绝，需要勾选上面的「接管旧账本」。';
+  } else {
+    note.style.display = 'none';
+  }
+}
+
+const EV = {
+  'login.ok': '登录成功', 'login.fail': '登录失败', 'login.locked': '登录被限速',
+  'login.via_token': 'token 换登录', 'logout': '退出登录',
+  'password.change': '修改密码', 'password.change.fail': '改密失败',
+  'sessions.revoke_others': '下线其他设备',
+  'admin.denied': '非管理员访问', 'admin.user.create': '创建用户', 'admin.user.delete': '删除用户',
+  'admin.user.disabled': '停用/启用', 'admin.password.reset': '重置密码', 'admin.token.rotate': '轮换 token',
+  'mcp.bad_token': 'MCP token 无效', 'mcp.forbidden': 'MCP 越权被拦',
+};
+
+async function loadAudit() {
+  const d = await j('GET', '/api/admin/audit?limit=50');
+  const evs = d.events || [];
+  $('audit').innerHTML = evs.length
+    ? evs.map((e) => {
+        const label = EV[e.ev] || e.ev;
+        const bad = /fail|locked|denied|forbidden|bad_token|delete/.test(e.ev);
+        const detail = e.detail
+          ? esc(Object.keys(e.detail).map((k) => k + '=' + e.detail[k]).join(' '))
+          : '<span class="muted">—</span>';
+        return `<tr>
+          <td class="muted">${esc(short(e.t))}</td>
+          <td><span class="ev${bad ? ' tag off' : ''}" style="background:none;padding:0">${esc(label)}</span>
+            <div class="tiny">${esc(e.ev)}</div></td>
+          <td>${esc(e.userId) || '<span class="muted">—</span>'}</td>
+          <td class="muted">${esc(e.ip) || '—'}</td>
+          <td class="muted">${detail}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="5" class="muted">还没有记录</td></tr>';
+}
+
+async function act(kind, userId, btn) {
+  const lmsg = $('lmsg');
+  lmsg.className = 'msg';
+  lmsg.textContent = '';
+  if (kind === 'pwd') {
+    const pw = prompt(`给 ${userId} 设置新密码（至少 8 位）：`);
+    if (!pw) return;
+    btn.disabled = true;
+    try {
+      await j('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/password', { password: pw, mustChange: true });
+      lmsg.className = 'msg ok';
+      lmsg.textContent = `已重置 ${userId} 的密码，其旧会话已全部失效；对方下次登录会被要求立即改密。`;
+      await load(); await loadAudit();
+    } catch (e) { lmsg.className = 'msg bad'; lmsg.textContent = e.message; }
+    finally { btn.disabled = false; }
+    return;
+  }
+  if (kind === 'tok') {
+    if (!confirm(`轮换 ${userId} 的 MCP token？\n旧 token 立即失效，需要同步更新 Octop 连接器的 Headers。`)) return;
+    btn.disabled = true;
+    try {
+      const d = await j('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/token', {});
+      showToken(d.token);
+      await load(); await loadAudit();
+    } catch (e) { lmsg.className = 'msg bad'; lmsg.textContent = e.message; }
+    finally { btn.disabled = false; }
+    return;
+  }
+  if (kind === 'del') {
+    if (!confirm(`确定删除账号「${userId}」？`)) return;
+
+    let total = 0;
+    try {
+      const s = await j('GET', '/api/admin/users?stats=' + encodeURIComponent(userId));
+      total = (s.stats && s.stats.total) || 0;
+    } catch (e) { /* 拿不到统计就按 0 展示 */ }
+
+    const purge = confirm(
+      `「${userId}」名下有约 ${total} 条业务数据（交易/账户/分类等）。\n\n` +
+      `点「确定」= 连数据一起删，不可恢复\n` +
+      `点「取消」= 只删账号，账本保留（同名重建需勾选「接管旧账本」）`
+    );
+
+    btn.disabled = true;
+    try {
+      const d = await j('DELETE', '/api/admin/users/' + encodeURIComponent(userId) + '?purge=' + (purge ? '1' : '0'));
+      lmsg.className = 'msg ok';
+      lmsg.textContent = purge
+        ? `已删除 ${userId} 并清空其账本数据。`
+        : `已删除 ${userId}，账本保留；该用户名已标记为「已删除」，同名重建需勾选接管。`;
+      await load(); await loadAudit();
+    } catch (e) { lmsg.className = 'msg bad'; lmsg.textContent = e.message; }
+    finally { btn.disabled = false; }
+    return;
+  }
+  if (kind === 'disable' || kind === 'enable') {
+    btn.disabled = true;
+    try {
+      await j('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/disabled', { disabled: kind === 'disable' });
+      await load(); await loadAudit();
+    } catch (e) { lmsg.className = 'msg bad'; lmsg.textContent = e.message; }
+    finally { btn.disabled = false; }
+  }
+}
+
+$('cf').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = $('cmsg');
+  msg.className = 'msg';
+  msg.textContent = '';
+  $('cg').disabled = true;
+  try {
+    const d = await j('POST', '/api/admin/users', {
+      userId: $('nu').value.trim(),
+      label: $('nl').value.trim(),
+      password: $('np').value,
+      role: $('nr').value,
+      mustChange: true,
+      reclaim: $('nreclaim').checked,
+    });
+    showToken(d.token);
+    msg.className = 'msg ok';
+    msg.textContent = d.reclaimed
+      ? `已创建 ${d.user.userId}，并接管其原有账本。`
+      : `已创建 ${d.user.userId}。已自动建账本并播种 137 个默认分类；首次登录会要求改密。`;
+    $('nu').value = ''; $('nl').value = ''; $('np').value = ''; $('nreclaim').checked = false;
+    await load(); await loadAudit();
+  } catch (e2) {
+    msg.className = 'msg bad';
+    msg.textContent = e2.message;
+  } finally {
+    $('cg').disabled = false;
+  }
+});
+
+(async () => {
+  try {
+    ME = await j('GET', '/api/auth/me');
+    if (ME.role !== 'admin') {
+      document.querySelector('.wrap').innerHTML =
+        '<div class="panel">只有管理员能访问此页。<a href="/">返回工作台</a></div>';
+      return;
+    }
+    $('who').textContent = ME.userId + ' · 管理员';
+    await load();
+    await loadAudit();
+  } catch (e) {
+    $('lmsg').className = 'msg bad';
+    $('lmsg').textContent = e.message;
+  }
+})();
+</script>
+</body>
+</html>

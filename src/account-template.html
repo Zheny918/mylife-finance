@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>我的账号 · MyLife 财务工作台</title>
+<style>
+  :root { --bg:#f5f7fa; --card:#fff; --text:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+    --accent:#2563eb; --shadow:0 1px 3px rgba(0,0,0,.08); --bad:#dc2626; --warn:#b45309; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; font-size:14px; }
+  .topbar { display:flex; align-items:center; gap:14px; padding:14px 22px; background:var(--card);
+    border-bottom:1px solid var(--line); }
+  .topbar h1 { font-size:18px; margin:0; font-weight:600; }
+  .topbar .who { margin-left:auto; color:var(--muted); font-size:13px; }
+  .wrap { max-width:520px; margin:0 auto; padding:22px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:18px; box-shadow:var(--shadow); margin-bottom:16px; }
+  .panel h3 { margin:0 0 14px; font-size:15px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:0 0 5px; }
+  input { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:9px;
+    font-size:14px; font-family:inherit; margin-bottom:14px; }
+  input:focus { outline:none; border-color:var(--accent); }
+  button { padding:9px 16px; border:1px solid var(--line); border-radius:9px; background:#fff;
+    cursor:pointer; font-size:14px; font-family:inherit; color:var(--text); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.6; cursor:default; }
+  .msg { font-size:13px; min-height:20px; margin-top:10px; }
+  .msg.ok { color:#16a34a; } .msg.bad { color:var(--bad); }
+  .banner { background:#fffbeb; border:1px solid #fde68a; color:var(--warn);
+    border-radius:10px; padding:10px 14px; font-size:13px; margin-bottom:16px; display:none; }
+  .kv { font-size:13px; color:var(--muted); }
+  .kv b { color:var(--text); }
+  a { color:var(--accent); text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>我的账号</h1>
+  <div class="who" id="who">加载中…</div>
+</div>
+<div class="wrap">
+  <div class="banner" id="banner">当前密码是系统初始密码，请立即修改。</div>
+
+  <div class="panel">
+    <h3>身份</h3>
+    <div class="kv">用户名：<b id="uname">—</b></div>
+    <div class="kv">备注：<b id="ulabel">—</b></div>
+    <div class="kv">角色：<b id="urole">—</b></div>
+    <div class="kv" style="margin-top:10px"><a href="/">← 返回工作台</a></div>
+  </div>
+
+  <form class="panel" id="pwf">
+    <h3>修改密码</h3>
+    <label for="cur">当前密码</label>
+    <input id="cur" type="password" autocomplete="current-password" required />
+    <label for="np">新密码（至少 8 位）</label>
+    <input id="np" type="password" autocomplete="new-password" required minlength="8" />
+    <label for="np2">确认新密码</label>
+    <input id="np2" type="password" autocomplete="new-password" required minlength="8" />
+    <button class="primary" id="pwg" type="submit">保存</button>
+    <div class="msg" id="pwmsg"></div>
+  </form>
+
+  <div class="panel">
+    <h3>登录设备</h3>
+    <div class="kv">当前这台保持登录；执行后，其他浏览器/设备上的会话立即失效（不改密码）。</div>
+    <button id="offOthers" style="margin-top:12px">让其他设备下线</button>
+    <div class="msg" id="smsg"></div>
+  </div>
+</div>
+
+<script>
+let ME = null;
+const $ = (id) => document.getElementById(id);
+
+async function j(method, path, body) {
+  const r = await fetch(path, {
+    method,
+    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  let d = {};
+  try { d = await r.json(); } catch (e) {}
+  if (r.status === 401) { location.href = '/login'; throw new Error('未登录'); }
+  if (!r.ok || d.ok === false) throw new Error(d.error || ('HTTP ' + r.status));
+  return d;
+}
+
+(async () => {
+  const forced = new URLSearchParams(location.search).get('force') === '1';
+  try {
+    ME = await j('GET', '/api/auth/me');
+    $('uname').textContent = ME.userId;
+    $('ulabel').textContent = ME.label || '—';
+    $('urole').textContent = ME.role === 'admin' ? '管理员' : '成员';
+    $('who').textContent = ME.userId;
+    if (ME.mustChange) {
+      $('banner').style.display = 'block';
+      $('banner').textContent = forced
+        ? '这是临时密码（管理员重置或系统初始密码）。改完密码后才能进入工作台。'
+        : '当前密码是系统初始密码，请立即修改。';
+      $('cur').focus();
+    }
+  } catch (e) {
+    $('who').textContent = '';
+    $('pwmsg').textContent = e.message;
+    $('pwmsg').className = 'msg bad';
+  }
+})();
+
+$('offOthers').addEventListener('click', async () => {
+  const msg = $('smsg');
+  msg.className = 'msg';
+  msg.textContent = '';
+  if (!confirm('让其他设备上的登录全部失效？（当前这台不受影响）')) return;
+  $('offOthers').disabled = true;
+  try {
+    await j('POST', '/api/auth/logout-others', {});
+    msg.className = 'msg ok';
+    msg.textContent = '已让其他设备下线，当前设备仍然保持登录。';
+  } catch (e) {
+    msg.className = 'msg bad';
+    msg.textContent = e.message;
+  } finally {
+    $('offOthers').disabled = false;
+  }
+});
+
+$('pwf').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = $('pwmsg');
+  msg.className = 'msg';
+  msg.textContent = '';
+  if ($('np').value !== $('np2').value) {
+    msg.className = 'msg bad';
+    msg.textContent = '两次输入的新密码不一致';
+    return;
+  }
+  $('pwg').disabled = true;
+  try {
+    await j('POST', '/api/auth/password', {
+      currentPassword: $('cur').value,
+      newPassword: $('np').value,
+    });
+    msg.className = 'msg ok';
+    msg.textContent = '已保存，其他设备上的旧会话已失效。正在返回工作台…';
+    setTimeout(() => { location.href = '/'; }, 1000);
+  } catch (e2) {
+    msg.className = 'msg bad';
+    msg.textContent = e2.message;
+    $('pwg').disabled = false;
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+node_modules
+dist
+*.zip
+*.log
+docs
+octop-skill
+README.md
+SKILL.md
+_budget_test.cjs
+_dom_check.cjs
+.wb-run.log
+.git

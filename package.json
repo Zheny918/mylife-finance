@@ -1,0 +1,34 @@
+{
+  "name": "mylife-finance-skill",
+  "version": "1.2.3",
+  "description": "Standalone finance bookkeeping MCP server (stdio + streamable HTTP) with WorkBuddy/Octop skill",
+  "main": "server.js",
+  "type": "commonjs",
+  "bin": {
+    "mylife-finance": "server.js"
+  },
+  "scripts": {
+    "start": "node --no-warnings server.js",
+    "start:http": "node --no-warnings server-http.js",
+    "workbench": "node --no-warnings workbench.js",
+    "pack:octop": "node scripts/pack-octop-skill.mjs",
+    "test:xlsx": "node scripts/make-test-xlsx.mjs",
+    "test:import": "node scripts/test-importers.mjs",
+    "test:api": "node scripts/test-api-import.mjs",
+    "make:templates": "node scripts/make-import-templates.mjs",
+    "reset:data": "node scripts/reset-data.mjs",
+    "docker:build": "docker build -t mylife-finance-mcp:1.2.3 .",
+    "docker:verify": "node scripts/docker-build-verify.mjs",
+    "image:tar": "node scripts/build-image-tar.mjs",
+    "image:tar:gz": "node scripts/build-image-tar.mjs --gzip",
+    "image:tar:arm64": "node scripts/build-image-tar.mjs --platform linux/arm64 --gzip",
+    "test:auth": "node scripts/test-auth.mjs",
+    "test:webapp": "node scripts/test-webapp-http.mjs",
+    "user": "node src/cli.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "MIT",
+  "private": true
+}

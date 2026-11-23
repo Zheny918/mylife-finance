@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MyLife 财务看板</title>
+<script>/*__CHARTJS__*/</script>
+<style>
+  :root { --bg:#f5f7fa; --card:#ffffff; --text:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+    --income:#dc2626; --expense:#16a34a; --accent:#2563eb; --shadow:0 1px 3px rgba(0,0,0,.08); }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+  .wrap { max-width:1180px; margin:0 auto; padding:24px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:18px; }
+  .cards { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; box-shadow:var(--shadow); }
+  .card .label { color:var(--muted); font-size:12px; }
+  .card .value { font-size:22px; font-weight:600; margin-top:6px; }
+  .income { color:var(--income); } .expense { color:var(--expense); }
+  .filters { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:18px; display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; box-shadow:var(--shadow); }
+  .filters label { font-size:12px; color:var(--muted); display:block; margin-bottom:4px; }
+  .filters input, .filters select { padding:7px 9px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:#fff; color:var(--text); }
+  .grid2 { display:grid; grid-template-columns:1.4fr 1fr; gap:16px; margin-bottom:18px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; box-shadow:var(--shadow); }
+  .panel h3 { margin:0 0 12px; font-size:15px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:500; }
+  .tag { display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px; background:#eef2ff; color:#3730a3; margin-right:4px; }
+  .empty { color:var(--muted); padding:20px; text-align:center; }
+  @media (max-width:860px){ .cards{grid-template-columns:repeat(2,1fr);} .grid2{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>MyLife 财务看板</h1>
+  <div class="sub" id="genAt"></div>
+
+  <div class="cards" style="grid-template-columns:repeat(3,1fr);">
+    <div class="card"><div class="label">本年总收入</div><div class="value income" id="cIncome">—</div></div>
+    <div class="card"><div class="label">本年总支出</div><div class="value expense" id="cExpense">—</div></div>
+    <div class="card"><div class="label">本年净结余</div><div class="value" id="cNet">—</div></div>
+  </div>
+
+  <div class="filters">
+    <div><label>开始日期</label><input type="date" id="fFrom" /></div>
+    <div><label>结束日期</label><input type="date" id="fTo" /></div>
+    <div><label>类型</label>
+      <select id="fType"><option value="">全部</option><option value="INCOME">收入</option><option value="EXPENSE">支出</option><option value="TRANSFER">转账</option></select>
+    </div>
+    <div><label>账户</label><select id="fAccount"><option value="">全部</option></select></div>
+    <div><label>分类</label><select id="fCategory"><option value="">全部</option></select></div>
+    <div><label>&nbsp;</label><button id="fReset" style="padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">重置</button></div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel"><h3>本年 12 个月收支趋势</h3><canvas id="trendChart" height="120"></canvas></div>
+    <div class="panel"><h3>本年支出分类占比（一级分类）</h3><canvas id="catChart" height="120"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <h3>本月交易明细 <span id="rowCount" style="color:var(--muted);font-weight:400;font-size:13px;"></span></h3>
+    <div style="max-height:420px;overflow:auto;">
+      <table>
+        <thead><tr><th>日期</th><th>类型</th><th>账户</th><th>分类</th><th>说明</th><th>标签</th><th style="text-align:right;">金额</th></tr></thead>
+        <tbody id="txBody"></tbody>
+      </table>
+      <div class="empty" id="emptyHint" style="display:none;">无匹配交易</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = /*__DATA__*/;
+const fmt = (n) => '¥' + Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const typeText = { INCOME: '收入', EXPENSE: '支出', TRANSFER: '转账' };
+
+let trendChart, catChart;
+
+function initFilters() {
+  const accounts = [...new Set(DATA.transactions.map(t => t.account).filter(Boolean))].sort();
+  const cats = [...new Set(DATA.transactions.map(t => t.category).filter(Boolean))].sort();
+  const aSel = document.getElementById('fAccount'), cSel = document.getElementById('fCategory');
+  accounts.forEach(a => { const o = document.createElement('option'); o.value = a; o.textContent = a; aSel.appendChild(o); });
+  cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; cSel.appendChild(o); });
+  document.getElementById('genAt').textContent =
+    '生成时间：' + new Date(DATA.generatedAt).toLocaleString('zh-CN') + '　·　统计年份：' + DATA.year + ' 年';
+  ['fFrom','fTo','fType','fAccount','fCategory'].forEach(id => document.getElementById(id).addEventListener('change', render));
+  document.getElementById('fReset').addEventListener('click', () => {
+    ['fFrom','fTo','fType','fAccount','fCategory'].forEach(id => document.getElementById(id).value = '');
+    render();
+  });
+}
+
+function filtered() {
+  const from = document.getElementById('fFrom').value;
+  const to = document.getElementById('fTo').value;
+  const type = document.getElementById('fType').value;
+  const acc = document.getElementById('fAccount').value;
+  const cat = document.getElementById('fCategory').value;
+  return DATA.transactions.filter(t => {
+    const d = t.date || '';
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    if (type && t.type !== type) return false;
+    if (acc && t.account !== acc) return false;
+    if (cat && t.category !== cat) return false;
+    return true;
+  });
+}
+
+function render() {
+  const rows = filtered();
+  // 卡片为「本年」口径，不随明细筛选变化
+  document.getElementById('cIncome').textContent = fmt(DATA.yearIncome);
+  document.getElementById('cExpense').textContent = fmt(DATA.yearExpense);
+  document.getElementById('cNet').textContent = fmt(DATA.yearNet);
+
+  // 本年支出按一级分类占比（静态，来自服务端归并）
+  const l1 = DATA.expenseByCategoryL1 || [];
+  if (catChart) catChart.destroy();
+  catChart = new Chart(document.getElementById('catChart'), {
+    type: 'doughnut',
+    data: {
+      labels: l1.length ? l1.map(x => x.name) : ['本年暂无支出'],
+      datasets: [{ data: l1.length ? l1.map(x => x.amount) : [1], backgroundColor: l1.length ? l1.map((_, i) => `hsl(${(i * 47) % 360} 70% 60%)`) : ['#e5e7eb'] }],
+    },
+    options: { plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } }
+  });
+
+  // 明细表（本月交易，可按条件筛选）
+  const body = document.getElementById('txBody');
+  body.innerHTML = '';
+  document.getElementById('rowCount').textContent = '（' + rows.length + ' 笔）';
+  document.getElementById('emptyHint').style.display = rows.length ? 'none' : 'block';
+  rows.slice(0, 500).forEach(r => {
+    const tr = document.createElement('tr');
+    const amt = (r.type === 'EXPENSE' ? '-' : (r.type === 'INCOME' ? '+' : '')) + fmt(r.amount);
+    const amtCls = r.type === 'EXPENSE' ? 'expense' : (r.type === 'INCOME' ? 'income' : '');
+    const tags = (r.tags || '').split(',').filter(Boolean).map(t => `<span class="tag">${t}</span>`).join('');
+    tr.innerHTML = `<td>${r.date || ''}</td><td>${typeText[r.type] || r.type || ''}</td><td>${r.account || ''}</td><td>${r.category || ''}</td><td>${r.description || ''}</td><td>${tags}</td><td style="text-align:right;" class="${amtCls}">${amt}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+function initTrend() {
+  trendChart = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: DATA.trend.map(t => Number(t.month.slice(5, 7)) + '月'),
+      datasets: [
+        { label: '收入', data: DATA.trend.map(t => t.income), borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,.08)', tension: .3, fill: true },
+        { label: '支出', data: DATA.trend.map(t => t.expense), borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.08)', tension: .3, fill: true },
+      ]
+    },
+    options: { plugins: { legend: { position: 'top' } }, scales: { y: { ticks: { callback: (v) => '¥' + v } } } }
+  });
+}
+
+initFilters();
+initTrend();
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+# Octop + Finance MCP —— 同一 compose 项目部署（QNAP Container Station / 任意宿主通用）
+#
+# 为什么把两个 service 写进同一份文件：
+#   同一 compose 项目 → 同一个 docker 网络（下面显式命名的 mylife_net）→ 容器名与别名
+#   由 docker 内置 DNS 直接解析。不依赖「<项目名>_default」这种由部署时输入的应用名拼出来的
+#   网络名，也就不需要 external: true 去猜它。
+#
+# ★ 最关键的一条：Octop 的 URL 校验器只放行三类主机 —— 私网 IP 字面量（10./172.16-31./192.168./127.）、
+#   localhost、以及 .local / .internal / *.docker.internal 后缀。
+#   纯容器名 `mylife-finance-mcp` 三类都不占，会被判成公网地址、强制要求 HTTPS。
+#   所以给 MCP 加了别名 mylife-finance-mcp.internal，连接器 URL 用：
+#       http://mylife-finance-mcp.internal:3458/mcp/<用户名>
+#
+# 起之前确认镜像名（导入 tar 后可能被加成 <none>）：
+#   docker images | grep mylife
+# 若不是 mylife-finance-mcp:1.2.3，改下面 MCP 的 image: 一行。
+#
+# 起来后逐层验证（顺序别跳）：
+#   curl -s http://127.0.0.1:3458/health                      # 宿主上：MCP 活着
+#   docker exec octop sh -c 'wget -qO- http://mylife-finance-mcp.internal:3458/health'   # 容器间：真正通了
+#   curl -s http://127.0.0.1:18088/                            # 宿主上：Octop 活着
+
+# 保留 version 键：Container Station / 老版 docker-compose 不认不带 version 的 v2+ 文件
+version: "3.8"
+
+services:
+  octop:
+    image: ghcr.nju.edu.cn/tencentcloud/octop:latest
+    container_name: octop
+    restart: unless-stopped
+
+    ports:
+      - "18088:18088"
+
+    volumes:
+      # Octop 的全部状态都在这里（账号、Agent、技能、连接器配置），别丢
+      - /share/Container/octop:/data/.octop
+
+    environment:
+      HOME: /data
+      OCTOP_BIND_HOST: 0.0.0.0
+      OCTOP_PORT: 18088
+      OCTOP_LOG_LEVEL: info
+      OCTOP_ADMIN_USERNAME: admin
+      OCTOP_ADMIN_DISPLAY_NAME: Admin
+      # ★ 换成自己的强密码。18088 一旦对局域网开放，这就是唯一入口凭据
+      OCTOP_DEFAULT_PASSWORD: "AAAA"
+
+    # 只保证「先起 MCP 再起 Octop」，减少首次探测时 MCP 还没监听的概率；
+    # DNS 解析不受启动顺序影响（同一网络内随时可解析）。
+    depends_on:
+      - mylife-finance-mcp
+
+    networks:
+      - mylife_net
+
+  mylife-finance-mcp:
+    image: mylife-finance-mcp:1.2.3
+    container_name: mylife-finance-mcp
+    restart: unless-stopped
+
+    environment:
+      MYLF_DATA_DIR: /data
+      MYLF_HTTP_PORT: "3458"
+      MYLF_HTTP_HOST: 0.0.0.0
+      # ★ 对外基址：把看板路径拼成可点击 URL 返回给模型。不设的话 dashboard_build 只返回容器内路径，
+      #   Octop / 浏览器都打不开。填你实际访问 MCP 用的那个地址（带端口，不带结尾斜杠）
+      MYLF_PUBLIC_BASE_URL: "http://192.168.130.8:3458"
+
+      # ★ 1.1.2 起改成「一个用户一把 token」，不再共用一个全局令牌。
+      #   首次启动会在 /data/ADMIN-PASSWORD.txt 生成管理员初始密码（日志里也会提示）。
+      #   浏览器打开 http://<NAS_IP>:3458/login 登录 → 「用户管理」里给每个人建账号，
+      #   每个账号各自拿一个 MCP token，填进各自 Octop 连接器的 Headers。
+      #
+      #   下面的 MYLF_HTTP_TOKEN 是**旧版全局令牌**，为兼容现网暂时保留：
+      #   它只代表 MYLF_HTTP_TOKEN_USER 这一个用户（默认 admin），用它打别的用户名会 403。
+      # MYLF_HTTP_TOKEN: "换成一个 32 位以上的随机串"
+      # MYLF_HTTP_TOKEN_USER: "admin"
+
+      # 设 "0" 关闭「新用户首次访问自动开通租户 + 播种 137 个默认分类」
+      # MYLF_HTTP_AUTO_TENANT: "0"
+
+    volumes:
+      # ★ 用宿主目录（bind）：与现网部署一致，账本文件就在 /share/Container/mylife-finance-mcp/finance.db
+      #   千万别改成命名卷 —— 容器重建后会挂到一个空的 /data，界面显示空账本（数据其实还在旧目录）
+      - /share/Container/mylife-finance-mcp:/data
+      # 想改用命名卷（数据归 docker 管理、不进共享文件夹）就注释掉上面一行、打开下面一行，
+      # 同时把文件末尾 volumes: 那段的注释解开
+      # - mylife-finance-data:/data
+
+    ports:
+      # 左边是宿主端口，撞了改左边；右边必须 3458（与 MYLF_HTTP_PORT 一致）
+      # 只给 Octop 用的话可以把整段 ports 删掉 —— 容器间走网络，不经发布端口
+      - "3458:3458"
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3458/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    networks:
+      mylife_net:
+        # 带点的别名专为 Octop 的 URL 校验器准备；容器名 mylife-finance-mcp 同时仍然可用
+        aliases:
+          - mylife-finance-mcp.internal
+
+networks:
+  # 显式命名、由本文件创建和管理；两个 service 都加入，因此必然互通
+  mylife_net:
+    driver: bridge
+
+# 用 bind 挂载（默认）时这段用不上，留着会被 compose 提示「声明了但没使用」；
+# 改成命名卷时把下面两行解开
+# volumes:
+#   mylife-finance-data:

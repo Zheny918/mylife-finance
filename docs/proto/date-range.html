@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>日期区间选择器 · 原型</title>
+<style>
+  :root { --bg:#f5f7fa; --card:#fff; --text:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+    --accent:#2563eb; --shadow:0 1px 3px rgba(0,0,0,.08); }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-size:14px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px;
+    box-shadow:var(--shadow); margin:22px auto; max-width:980px; }
+  .panel h3 { margin:0 0 12px; font-size:15px; }
+  .btn { padding:7px 13px; border:1px solid var(--line); border-radius:8px; background:#fff;
+    cursor:pointer; font-size:13px; color:var(--text); }
+  .btn:hover { border-color:var(--accent); color:var(--accent); }
+  .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+  .toolbar label { font-size:12px; color:var(--muted); display:block; margin-bottom:4px; }
+  .toolbar select { padding:7px 9px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:#fff; }
+  .note { max-width:980px; margin:0 auto; font-size:12px; color:var(--muted); line-height:1.9; }
+  /* ---- 与 workbench-template.html 完全一致的区间控件样式 ---- */
+  .dr { position:relative; }
+  .dr-box { position:relative; display:inline-block; }
+  .dr-text { padding:7px 30px 7px 9px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:#fff; min-width:215px; cursor:pointer; color:var(--text); }
+  .dr-text.on { border-color:var(--accent); box-shadow:0 0 0 2px rgba(37,99,235,.12); }
+  .dr-x { position:absolute; right:7px; top:50%; transform:translateY(-50%); width:17px; height:17px; line-height:15px; text-align:center; border-radius:50%; color:var(--muted); font-size:14px; cursor:pointer; display:none; }
+  .dr-x.show { display:block; }
+  .dr-x:hover { background:#eef2f7; color:var(--text); }
+  .dr-pop { position:absolute; top:calc(100% + 6px); left:0; z-index:60; display:none; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.14); overflow:hidden; }
+  .dr-pop.open { display:flex; }
+  .dr-presets { border-right:1px solid var(--line); padding:8px; display:flex; flex-direction:column; gap:2px; min-width:104px; background:#fbfcfe; }
+  .dr-presets button { border:none; background:none; text-align:left; padding:7px 10px; border-radius:7px; font-size:13px; color:var(--text); cursor:pointer; white-space:nowrap; }
+  .dr-presets button:hover { background:#eef2f7; }
+  .dr-presets button.on { background:#e8f0fe; color:var(--accent); }
+  .dr-main { padding:10px 12px 0; }
+  .dr-months { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .dr-mhead { display:flex; align-items:center; justify-content:space-between; padding:2px 4px 8px; font-size:13px; font-weight:600; }
+  .dr-mhead button { border:none; background:none; cursor:pointer; color:var(--muted); font-size:14px; padding:0 6px; border-radius:6px; }
+  .dr-mhead button:hover { background:#eef2f7; color:var(--text); }
+  .dr-grid { display:grid; grid-template-columns:repeat(7,30px); gap:2px; }
+  .dr-grid span { text-align:center; font-size:11px; color:var(--muted); padding:2px 0 4px; }
+  .dr-grid b { text-align:center; font-size:12.5px; font-weight:400; height:28px; line-height:28px; border-radius:7px; cursor:pointer; }
+  .dr-grid b:hover { background:#eef2f7; }
+  .dr-grid b.mute { color:#c7ccd6; }
+  .dr-grid b.in { background:#e8f0fe; color:var(--accent); }
+  .dr-grid b.edge { background:var(--accent); color:#fff; }
+  .dr-grid b.today { box-shadow:inset 0 0 0 1px var(--accent); }
+  .dr-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 12px; margin-top:8px; border-top:1px solid var(--line); background:#fbfcfe; }
+  .dr-foot .hint { font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="panel">
+  <h3>报表 / 收支明细的筛选条（日期已合并成一个控件）</h3>
+  <div class="toolbar">
+    <div><label>类型</label><select><option>全部收支</option><option>只看收入</option><option>只看支出</option></select></div>
+    <div class="dr" id="demoRangeWrap">
+      <label>日期</label>
+      <div class="dr-box">
+        <input class="dr-text" id="demoRangeText" readonly placeholder="开始日期 至 结束日期" />
+        <span class="dr-x" id="demoRangeClear" title="清空">×</span>
+      </div>
+      <input type="hidden" id="demoFrom" /><input type="hidden" id="demoTo" />
+      <div class="dr-pop" id="demoRangePop">
+        <div class="dr-presets" id="demoPresets">
+          <button data-p="thisMonth">本月</button>
+          <button data-p="lastMonth">上月</button>
+          <button data-p="last3m">近 3 月</button>
+          <button data-p="last6m">近 6 月</button>
+          <button data-p="thisYear">本年</button>
+          <button data-p="lastYear">去年</button>
+          <button data-p="last7d">前 7 天</button>
+          <button data-p="thisWeek">本周内</button>
+          <button data-p="thisQuarter">本季度</button>
+        </div>
+        <div class="dr-main">
+          <div class="dr-months">
+            <div>
+              <div class="dr-mhead"><button data-mv="-1" title="上一月">«</button><span id="demoCalHeadA"></span><span></span></div>
+              <div class="dr-grid" id="demoCalA"></div>
+            </div>
+            <div>
+              <div class="dr-mhead"><span></span><span id="demoCalHeadB"></span><button data-mv="1" title="下一月">»</button></div>
+              <div class="dr-grid" id="demoCalB"></div>
+            </div>
+          </div>
+          <div class="dr-foot">
+            <span class="hint" id="demoRangeHint">请选择开始日期</span>
+            <span><button class="btn" id="demoRangeClear2">清空</button> <button class="btn primary" id="demoRangeOk">确定</button></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div><label>账户</label><select><option>全部</option></select></div>
+    <div><label>成员</label><select><option>全部</option></select></div>
+    <div><label>备注说明</label><input placeholder="关键词" style="padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:130px" /></div>
+    <div><label>&nbsp;</label><button class="btn primary">查询</button></div>
+    <div><label>&nbsp;</label><button class="btn">重置</button></div>
+  </div>
+</div>
+
+<div class="note">
+  <p><b>操作</b>：点日历选开始日、再点结束日（反着点会自动排序）；左侧是快捷区间；点「确定」才写回，点「清空」清掉，点面板外收起。</p>
+  <p><b>说明</b>：这是原型页，只演示日期控件本身。正式实现内联在 <code>src/workbench-template.html</code>，报表与收支明细各挂一个（id 前缀 <code>rp</code> / <code>f</code>）。</p>
+</div>
+
+<script>
+/* ---- 与 workbench-template.html 中同名的实现（原型拷贝，改逻辑请改正式文件） ---- */
+const drYmd = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+const drDaysIn = (y, m) => new Date(y, m, 0).getDate();
+function drToday() { const n = new Date(); return drYmd(n.getFullYear(), n.getMonth() + 1, n.getDate()); }
+function drShift(s, n) {
+  const [y, m, d] = String(s).split('-').map(Number);
+  const t = new Date(y, m - 1, d + n);
+  return drYmd(t.getFullYear(), t.getMonth() + 1, t.getDate());
+}
+function drMonthSpan(y, m) { return [drYmd(y, m, 1), drYmd(y, m, drDaysIn(y, m))]; }
+
+const DR_PRESETS = {
+  thisMonth() { const n = new Date(); return drMonthSpan(n.getFullYear(), n.getMonth() + 1); },
+  lastMonth() {
+    const n = new Date(); const m0 = n.getMonth();
+    return m0 === 0 ? drMonthSpan(n.getFullYear() - 1, 12) : drMonthSpan(n.getFullYear(), m0);
+  },
+  last3m() { const n = new Date(); const s = new Date(n.getFullYear(), n.getMonth() - 2, 1); return [drYmd(s.getFullYear(), s.getMonth() + 1, 1), drToday()]; },
+  last6m() { const n = new Date(); const s = new Date(n.getFullYear(), n.getMonth() - 5, 1); return [drYmd(s.getFullYear(), s.getMonth() + 1, 1), drToday()]; },
+  thisYear() { const y = new Date().getFullYear(); return [`${y}-01-01`, `${y}-12-31`]; },
+  lastYear() { const y = new Date().getFullYear() - 1; return [`${y}-01-01`, `${y}-12-31`]; },
+  last7d() { return [drShift(drToday(), -6), drToday()]; },
+  thisWeek() {
+    const n = new Date(); const dow = n.getDay() === 0 ? 7 : n.getDay();
+    const mon = drShift(drToday(), -(dow - 1));
+    return [mon, drShift(mon, 6)];
+  },
+  thisQuarter() {
+    const n = new Date(); const q = Math.floor(n.getMonth() / 3);
+    const s = new Date(n.getFullYear(), q * 3, 1), e = new Date(n.getFullYear(), q * 3 + 3, 0);
+    return [drYmd(s.getFullYear(), s.getMonth() + 1, s.getDate()), drYmd(e.getFullYear(), e.getMonth() + 1, e.getDate())];
+  },
+};
+
+function initDateRange(prefix, onChange) {
+  const el = (k) => document.getElementById(prefix + k);
+  const wrap = el('RangeWrap'), text = el('RangeText'), pop = el('RangePop'), hint = el('RangeHint');
+  const fromEl = el('From'), toEl = el('To');
+  const clearBtn = el('RangeClear'), clear2 = el('RangeClear2'), okBtn = el('RangeOk');
+
+  let cursor = null;
+  let selA = null, selE = null;
+
+  const monthOf = (s) => { const [y, m] = String(s).split('-').map(Number); return { y, m }; };
+  const nowMonth = () => { const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() + 1 }; };
+
+  function syncText() {
+    const f = fromEl.value, t = toEl.value;
+    text.value = f && t ? (f === t ? f : `${f} 至 ${t}`) : (f ? `${f} 至 …` : '');
+    if (f || t) clearBtn.classList.add('show');
+    else clearBtn.classList.remove('show');
+  }
+  function updateHint() {
+    hint.textContent = selA && selE ? `${selA} ~ ${selE}` : (selA ? '再点一天作为结束日期' : '请选择开始日期');
+  }
+  function markPreset() {
+    const box = el('Presets');
+    if (!box || !box.children) return;
+    const key = Object.keys(DR_PRESETS).find((k) => {
+      const [a, b] = DR_PRESETS[k]();
+      return a === selA && b === selE;
+    }) || '';
+    Array.from(box.children).forEach((btn) => {
+      if (btn.dataset && btn.dataset.p === key) btn.classList.add('on');
+      else btn.classList.remove('on');
+    });
+  }
+  function paint(gridId, headId, y, m) {
+    const g = document.getElementById(gridId), h = document.getElementById(headId);
+    h.textContent = `${y} 年 ${m} 月`;
+    const td = drToday();
+    const lead = new Date(y, m - 1, 1).getDay();
+    const total = drDaysIn(y, m);
+    let html = ['日', '一', '二', '三', '四', '五', '六'].map((d) => `<span>${d}</span>`).join('');
+    for (let i = 0; i < lead; i++) html += '<b class="mute"></b>';
+    for (let d = 1; d <= total; d++) {
+      const ds = drYmd(y, m, d);
+      let cls = '';
+      if (selA && selE && ds > selA && ds < selE) cls = 'in';
+      if (ds === selA || ds === selE) cls = 'edge';
+      if (ds === td) cls = (cls ? cls + ' ' : '') + 'today';
+      html += `<b data-d="${ds}"${cls ? ` class="${cls}"` : ''}>${d}</b>`;
+    }
+    g.innerHTML = html;
+  }
+  function render() {
+    if (!cursor) cursor = selA ? monthOf(selA) : nowMonth();
+    const a = cursor;
+    const b = a.m === 12 ? { y: a.y + 1, m: 1 } : { y: a.y, m: a.m + 1 };
+    paint(prefix + 'CalA', prefix + 'CalHeadA', a.y, a.m);
+    paint(prefix + 'CalB', prefix + 'CalHeadB', b.y, b.m);
+    updateHint();
+    markPreset();
+  }
+  function open() {
+    selA = fromEl.value || null;
+    selE = toEl.value || null;
+    cursor = selA ? monthOf(selA) : nowMonth();
+    pop.classList.add('open');
+    text.classList.add('on');
+    render();
+  }
+  function cancel() { pop.classList.remove('open'); text.classList.remove('on'); }
+  function pick(ds) {
+    if (!selA || (selA && selE)) { selA = ds; selE = null; }
+    else if (ds < selA) { selE = selA; selA = ds; }
+    else { selE = ds; }
+    render();
+  }
+  function shiftMonth(n) {
+    const m = cursor.m + n;
+    cursor = m < 1 ? { y: cursor.y - 1, m: 12 } : (m > 12 ? { y: cursor.y + 1, m: 1 } : { y: cursor.y, m });
+    render();
+  }
+  function commit() {
+    fromEl.value = selA || '';
+    toEl.value = selA ? (selE || selA) : '';
+    syncText(); cancel();
+    if (onChange) onChange(api);
+  }
+  function clear(notify) {
+    selA = null; selE = null;
+    fromEl.value = ''; toEl.value = '';
+    syncText(); cancel();
+    if (notify && onChange) onChange(api);
+  }
+
+  text.addEventListener('click', () => { if (pop.classList.contains('open')) cancel(); else open(); });
+  clearBtn.addEventListener('click', (e) => { if (e && e.stopPropagation) e.stopPropagation(); clear(true); });
+  clear2.addEventListener('click', () => clear(true));
+  okBtn.addEventListener('click', commit);
+  pop.addEventListener('click', (e) => {
+    const t = e && e.target;
+    if (!t || !t.dataset) return;
+    if (t.dataset.p && DR_PRESETS[t.dataset.p]) {
+      const [a, b] = DR_PRESETS[t.dataset.p]();
+      selA = a; selE = b; cursor = monthOf(a); render();
+      return;
+    }
+    if (t.dataset.mv) { shiftMonth(Number(t.dataset.mv)); return; }
+    if (t.dataset.d) { pick(t.dataset.d); return; }
+  });
+  document.addEventListener('click', (e) => {
+    if (!pop.classList.contains('open')) return;
+    const t = e && e.target;
+    if (t === text) return;
+    if (wrap.contains && wrap.contains(t)) return;
+    cancel();
+  });
+
+  syncText();
+
+  const api = {
+    get from() { return fromEl.value || ''; },
+    get to() { return toEl.value || ''; },
+    set(a, b) {
+      selA = a || null; selE = b || a || null;
+      fromEl.value = a || ''; toEl.value = a ? (b || a) : '';
+      syncText();
+    },
+    clear() { clear(false); },
+    open,
+  };
+  return api;
+}
+
+// 原型：默认展开，打开就能看到面板长什么样
+const demo = initDateRange('demo', () => {});
+demo.open();
+</script>
+</body>
+</html>

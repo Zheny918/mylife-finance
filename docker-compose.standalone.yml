@@ -1,0 +1,71 @@
+# Finance MCP Server — 独立部署（纯用已导入的镜像，不含 build）
+#
+# 适用场景：
+#   · 镜像来自 dist/*.tar（docker load / Container Station「导入映像」），宿主机上没有源码目录
+#   · QNAP / 群晖 / 任意 Linux 宿主，用图形界面粘贴 YAML 或 docker compose 起
+#   · Octop 不在同一台机器、或不想把它接入 Octop 的 docker 网络
+#
+# 与本目录的 docker-compose.mylife-finance.yml 的区别：
+#   仓库版  带 build（要源码）+ 接入 external 网络 octop_default（要 Octop 同机）
+#   本文件  只用 image + 独立网络 + 发布端口，任何宿主机都能起
+#
+# 起之前先确认镜像名（导入镜像后可能被加/掉 tag）：
+#   docker images | grep mylife
+# 若不是 mylife-finance-mcp:1.2.3，改下面的 image: 一行。
+#
+# 起来后：
+#   健康检查  curl -s http://<宿主IP>:3458/health
+#   Octop 连接器 URL（见 docs/OCTOP-DEPLOY.md §5.1，纯容器名会被判成公网地址）：
+#     同机同网络  http://mylife-finance-mcp.internal:3458/mcp/<用户名>
+#     跨机 / 局域网 http://<宿主私网IP>:3458/mcp/<用户名>   ← 需同时设 MYLF_HTTP_TOKEN
+
+# 保留 version 键：Container Station / 老版 docker-compose 不认不带 version 的 v2+ 文件
+version: "3.8"
+
+services:
+  mylife-finance-mcp:
+    image: mylife-finance-mcp:1.2.3
+    container_name: mylife-finance-mcp
+    restart: unless-stopped
+    environment:
+      MYLF_DATA_DIR: /data
+      MYLF_HTTP_PORT: "3458"
+      MYLF_HTTP_HOST: 0.0.0.0
+      # ★ 对外基址：把看板路径拼成可点击 URL 返回给模型。不设的话 dashboard_build 只返回容器内路径，
+      #   Octop / 浏览器都打不开。填你实际访问 MCP 用的那个地址（带端口，不带结尾斜杠）
+      MYLF_PUBLIC_BASE_URL: "http://192.168.130.8:3458"
+
+      # ★ 1.1.2 起是「一个用户一把 token」：首次启动生成管理员密码到
+      #   /data/ADMIN-PASSWORD.txt，浏览器打开 http://<主机>:3458/login 登录后在
+      #   「用户管理」里建账号、给每人发独立 token。
+      #   下面的 MYLF_HTTP_TOKEN 是旧版全局令牌（只代表 MYLF_HTTP_TOKEN_USER 一个人），
+      #   仅用于从 1.1.1 平滑升级。
+      # MYLF_HTTP_TOKEN: "换成一个 32 位以上的随机串"
+      # MYLF_HTTP_TOKEN_USER: "admin"
+
+      # 设 0 关闭「新用户首次访问自动开通租户 + 播种 137 个默认分类」
+      # MYLF_HTTP_AUTO_TENANT: "0"
+
+    volumes:
+      # 命名卷：数据由 docker 管理，删除容器不丢
+      - mylife-finance-data:/data
+      # QNAP / 群晖想落进共享文件夹（便于快照备份）就注释掉上面一行，改用 bind：
+      # - /share/Container/mylife-finance:/data
+
+    ports:
+      # 左边是宿主机端口，撞了改左边；右边必须保持 3458（与 MYLF_HTTP_PORT 一致）
+      - "3458:3458"
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3458/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mylife-finance-data:

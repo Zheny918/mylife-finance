@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>登录 · MyLife 财务工作台</title>
+<style>
+  :root { --bg:#f5f7fa; --card:#fff; --text:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+    --accent:#2563eb; --shadow:0 1px 3px rgba(0,0,0,.08); --bad:#dc2626; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; font-size:14px; }
+  .box { width:360px; max-width:92vw; background:var(--card); border:1px solid var(--line);
+    border-radius:14px; padding:26px; box-shadow:var(--shadow); }
+  h1 { font-size:17px; margin:0 0 4px; font-weight:600; }
+  .sub { color:var(--muted); font-size:12px; margin-bottom:20px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:0 0 5px; }
+  input { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:9px;
+    font-size:14px; font-family:inherit; margin-bottom:14px; }
+  input:focus { outline:none; border-color:var(--accent); }
+  button { width:100%; padding:10px; border:none; border-radius:9px; background:var(--accent);
+    color:#fff; font-size:14px; cursor:pointer; font-family:inherit; }
+  button:disabled { opacity:.6; cursor:default; }
+  .err { color:var(--bad); font-size:12px; min-height:18px; margin-top:10px; }
+  .foot { color:var(--muted); font-size:11px; margin-top:14px; line-height:1.6; }
+</style>
+</head>
+<body>
+<form class="box" id="f" autocomplete="on">
+  <h1>MyLife 财务工作台</h1>
+  <div class="sub">用你的账本账号登录，只能看到自己的数据</div>
+  <label for="u">用户名</label>
+  <input id="u" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required />
+  <label for="p">密码</label>
+  <input id="p" name="password" type="password" autocomplete="current-password" required />
+  <button id="go" type="submit">登录</button>
+  <div class="err" id="err"></div>
+  <div class="foot">账号由管理员在「用户管理」中创建。忘记密码请让管理员重置。</div>
+</form>
+
+<script>
+const f = document.getElementById('f');
+const err = document.getElementById('err');
+const go = document.getElementById('go');
+
+f.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  err.textContent = '';
+  go.disabled = true;
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: document.getElementById('u').value.trim(),
+        password: document.getElementById('p').value,
+      }),
+    });
+    let data = {};
+    try { data = await res.json(); } catch (e2) {}
+    if (!res.ok || data.ok === false) {
+      err.textContent = data.error || ('登录失败（HTTP ' + res.status + '）');
+      return;
+    }
+    location.href = '/';
+  } catch (e3) {
+    err.textContent = '无法连接服务器：' + e3.message;
+  } finally {
+    go.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

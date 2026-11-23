@@ -1,0 +1,22 @@
+# 依赖与构建产物（镜像 tar 走 GitHub Releases，不入库）
+node_modules/
+dist/
+*.tar
+*.tar.gz
+*.zip
+
+# 运行时数据：账本、管理员口令、会话密钥、用户表
+data/
+*.db
+*.db-wal
+*.db-shm
+ADMIN-PASSWORD.txt
+session.key
+users.json
+*.backup
+
+# 临时与日志
+*.log
+_tmp*/
+.DS_Store
+Thumbs.db
