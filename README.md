@@ -4,6 +4,8 @@
 
 > 当前 **v1.2.4** · Node **≥ 22.13** · **零 npm 依赖** · 工具 **44 个**（HTTP 模式下 43 个，`user_create` 被移除）
 
+界面长什么样 → [§3.1 界面预览](#31-界面预览)（11 个页签全截图）
+
 ## 1 架构
 
 ```
@@ -96,6 +98,21 @@ MCP 是**无状态 HTTP**，账本只有服务端一份 —— 多个客户端�
 | **项目 / 人员 / 商家** | 各自增删改；商家分类是一级分类下拉，颜色用取色器 |
 
 写操作全部走 `/api/*` 复用同一套逻辑，身份只来自服务端会话。首页 `GET /api/summary`、报表 `GET /api/reports/overview`、下拉选项 `GET /api/selectors`（按引用次数降序）。
+
+### 3.1 界面预览
+
+全部截图取自 `node workbench.js` 起的本地实例（示意数据，非真实账目），原图在 [`docs/pic/`](docs/pic/)。
+
+| | |
+|---|---|
+| **首页**<br><img src="docs/pic/1.png" width="400"><br>八张卡片（含累计天数/明细数）+ 收支双柱/结余折线混合图 + 本年/本月支出占比 | **收支明细**<br><img src="docs/pic/2.png" width="400"><br>13 列明细；底部「本页合计 / 全部合计」两行 + 页码与每页条数 |
+| **报表**<br><img src="docs/pic/3.png" width="400"><br>收入类型 / 支出类型 / 账户 / 成员 / 商家 / 项目 六个维度 | **手工记账**<br><img src="docs/pic/4.png" width="400"><br>类型·日期(到秒) → 账户·金额 → 一二级分类 → 成员/商家/项目/说明/标签 |
+| **应收应付**<br><img src="docs/pic/5.png" width="400"><br>未结清合计 + 状态分布，状态显示为中文 | **预算**<br><img src="docs/pic/6.png" width="400"><br>年/月两级预算，预算额 / 已用 / 剩余 / 使用率 |
+| **账户管理**<br><img src="docs/pic/7.png" width="400"><br>卡号、备注、类别筛选；改余额会补一笔「余额调整」流水 | **分类管理**<br><img src="docs/pic/8.png" width="400"><br>支出/收入左右并排；一级分类带底色并默认折叠 |
+| **项目管理**<br><img src="docs/pic/9.png" width="400"><br>名称/图标/颜色/起止时间 | **人员（成员）**<br><img src="docs/pic/10.png" width="400"><br>姓名/电话/邮箱 |
+| **商家**<br><img src="docs/pic/11.png" width="400"><br>分类取一级分类，颜色用取色器 | |
+
+> 报表那张截图拍于 **1.2.3**（当时账户/成员/商家/项目各一张合并图）；**1.2.4 起每个维度拆成「收入统计」「支出统计」两张，共 10 张**，界面以外的接口与数据结构没变。
 
 ## 4 Excel / CSV 导入
 
@@ -239,6 +256,7 @@ mylife-finance-skill/
 ├── docker-compose.qnap-octop-mcp.yml    # Octop + MCP 同一份（天然同网络）
 ├── install.sh                   # 装技能到 Octop Agent
 ├── docs/OCTOP-DEPLOY.md         # 部署 / 隔离 / 排障完整指南
+├── docs/pic/                    # 界面截图（README §3.1 引用）
 ├── docs/archive/                # 精简前的原版文档（v1.2.2）
 ├── octop-skill/                 # Octop 技能包源（打包进 dist/*.zip）
 ├── scripts/                     # 打包 / 出镜像 / 9 套测试 / 重置数据
