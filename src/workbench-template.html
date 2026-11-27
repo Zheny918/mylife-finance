@@ -249,12 +249,20 @@
       <div class="panel"><h3>支出类型占比</h3><div class="chart-box"><canvas id="repExpense"></canvas></div></div>
     </div>
     <div class="grid2">
-      <div class="panel"><h3>账户收支</h3><div class="chart-box"><canvas id="repAccount"></canvas></div></div>
-      <div class="panel"><h3>成员收支</h3><div class="chart-box"><canvas id="repMember"></canvas></div></div>
+      <div class="panel"><h3>账户收入统计</h3><div class="chart-box"><canvas id="repAccountIncome"></canvas></div></div>
+      <div class="panel"><h3>账户支出统计</h3><div class="chart-box"><canvas id="repAccountExpense"></canvas></div></div>
     </div>
     <div class="grid2">
-      <div class="panel"><h3>商家收支</h3><div class="chart-box"><canvas id="repMerchant"></canvas></div></div>
-      <div class="panel"><h3>项目收支</h3><div class="chart-box"><canvas id="repProject"></canvas></div></div>
+      <div class="panel"><h3>成员收入统计</h3><div class="chart-box"><canvas id="repMemberIncome"></canvas></div></div>
+      <div class="panel"><h3>成员支出统计</h3><div class="chart-box"><canvas id="repMemberExpense"></canvas></div></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h3>商家收入统计</h3><div class="chart-box"><canvas id="repMerchantIncome"></canvas></div></div>
+      <div class="panel"><h3>商家支出统计</h3><div class="chart-box"><canvas id="repMerchantExpense"></canvas></div></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h3>项目收入统计</h3><div class="chart-box"><canvas id="repProjectIncome"></canvas></div></div>
+      <div class="panel"><h3>项目支出统计</h3><div class="chart-box"><canvas id="repProjectExpense"></canvas></div></div>
     </div>
   </section>
 
@@ -2081,18 +2089,8 @@ document.getElementById('txReset').addEventListener('click', () => {
   loadTx();
 });
 
-// ---------- 报表（统一筛选 + 六张饼图） ----------
+// ---------- 报表（统一筛选 + 十张饼图） ----------
 const repCharts = {};
-
-/**
- * 饼图口径直接由「类型」决定，不再单设「饼图口径」下拉（两者语义重合）：
- *   全部收支 → 合计；只看收入 → 收入；只看支出 → 支出。
- * 收入/支出两张分类图口径固定，不受影响。
- */
-function repBasis() {
-  const t = document.getElementById('rpType').value;
-  return t === 'INCOME' ? 'income' : (t === 'EXPENSE' ? 'expense' : 'amount');
-}
 
 function fillReportSelects() {
   const set = (id, items, allLabel) => {
@@ -2145,13 +2143,21 @@ async function loadReports() {
     `<div class="s">笔数<b>${t.count || 0}</b></div>` +
     `<div class="s">当前筛选<b style="font-size:12px;font-weight:400;">${bits.join(' · ')}</b></div>`;
 
-  const basis = repBasis();
+  // 分类两张图口径固定；四个维度各拆成「收入 / 支出」两张，口径不再由「类型」推导
   repCharts.income = drawDoughnut('repIncome', repCharts.income, repItems(d.incomeByCategory, 'income'), '所选条件下无收入');
   repCharts.expense = drawDoughnut('repExpense', repCharts.expense, repItems(d.expenseByCategory, 'expense'), '所选条件下无支出');
-  repCharts.account = drawDoughnut('repAccount', repCharts.account, repItems(d.byAccount, basis), '所选条件下无数据');
-  repCharts.member = drawDoughnut('repMember', repCharts.member, repItems(d.byMember, basis), '所选条件下无数据');
-  repCharts.merchant = drawDoughnut('repMerchant', repCharts.merchant, repItems(d.byMerchant, basis), '所选条件下无数据');
-  repCharts.project = drawDoughnut('repProject', repCharts.project, repItems(d.byProject, basis), '所选条件下无数据');
+  const dims = [
+    { key: 'Account', rows: d.byAccount, label: '账户' },
+    { key: 'Member', rows: d.byMember, label: '成员' },
+    { key: 'Merchant', rows: d.byMerchant, label: '商家' },
+    { key: 'Project', rows: d.byProject, label: '项目' },
+  ];
+  dims.forEach(({ key, rows, label }) => {
+    repCharts[key + 'Income'] = drawDoughnut('rep' + key + 'Income', repCharts[key + 'Income'],
+      repItems(rows, 'income'), '所选条件下无' + label + '收入');
+    repCharts[key + 'Expense'] = drawDoughnut('rep' + key + 'Expense', repCharts[key + 'Expense'],
+      repItems(rows, 'expense'), '所选条件下无' + label + '支出');
+  });
 }
 
 document.getElementById('rpRun').addEventListener('click', () => loadReports().catch((e) => toast(e.message)));
@@ -2162,7 +2168,7 @@ document.getElementById('rpReset').addEventListener('click', () => {
   setReportRangeThisYear();
   loadReports().catch((e) => toast(e.message));
 });
-// 类型一变，四张维度饼图的口径跟着变，直接重查（不用再点「查询」）
+// 类型一变，服务端过滤结果就变（只看收入时，四张支出图会显示「无…支出」），直接重查
 document.getElementById('rpType').addEventListener('change', () => loadReports().catch((e) => toast(e.message)));
 
 // ---------- 手工记账 / 编辑 ----------

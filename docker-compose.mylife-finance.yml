@@ -18,7 +18,7 @@ services:
       context: .
       dockerfile: Dockerfile
     # 标签与 package.json 版本保持一致；换标签可用 MYLF_IMAGE 覆盖
-    image: ${MYLF_IMAGE:-mylife-finance-mcp:1.2.3}
+    image: ${MYLF_IMAGE:-mylife-finance-mcp:1.2.4}
     container_name: mylife-finance-mcp
     restart: unless-stopped
     environment:

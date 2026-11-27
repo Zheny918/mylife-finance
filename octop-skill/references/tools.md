@@ -115,7 +115,7 @@ filters             回显本次生效的筛选条件（未给的字段为 null�
 ```
 
 要「收入类型饼图」用 `incomeByCategory`，「支出类型饼图」用 `expenseByCategory`，
-「账户/成员/商家/项目收支饼图」用对应维度并按需在 `income` 与 `expense` 之间切口径。
+「账户/成员/商家/项目」每个维度同时带 `income` 与 `expense` 两个值 —— 工作台据此各出两张图：`账户收入统计` 取 `income`、`账户支出统计` 取 `expense`，四个维度同理。
 `categoryId` 会展开整棵子树；`q` 只匹配说明文字。
 
 > `dashboard_build` 的 `path` 是**服务端容器内路径**，你在对话里读不到那个文件。可用的做法：① 若返回了 `url`（部署方已设 `MYLF_PUBLIC_BASE_URL`），把它原样给用户，浏览器可直接打开；② 未返回 `url` 时用 `relativeUrl` 提示用户访问 `<服务地址>/dashboard.html`；③ 只想要数字，优先用 `report_*` 类工具。

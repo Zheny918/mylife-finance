@@ -38,7 +38,7 @@ description: 个人财务记账与报表。当用户要记账、报一笔收支�
 - 只看某一年 → `tx_list({year:2026})`；只查说明里含某个词 → 加 `q`
 - 月度收支汇总 → `report_monthly({year:2026, month:11})`
 - **多维透视**（收入/支出分别按分类、账户、成员、商家、项目）→ `report_overview({from, to})`，
-  要饼图数据就取 `incomeByCategory` / `expenseByCategory` / `byAccount` 等字段
+  要饼图数据就取 `incomeByCategory` / `expenseByCategory` / `byAccount` 等字段；四个维度每项都带 `income` 与 `expense`，想拆「收入榜 / 支出榜」就各取一个字段
 
 **传一级分类会自动包含其下全部二级分类**，所以「食品酒水」能查到「三餐」的交易。
 用 `categoryId` 过滤同理，效果和传一级名称一致。

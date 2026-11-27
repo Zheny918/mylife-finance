@@ -11,7 +11,7 @@
 #
 # 起之前先确认镜像名（导入镜像后可能被加/掉 tag）：
 #   docker images | grep mylife
-# 若不是 mylife-finance-mcp:1.2.3，改下面的 image: 一行。
+# 若不是 mylife-finance-mcp:1.2.4，改下面的 image: 一行。
 #
 # 起来后：
 #   健康检查  curl -s http://<宿主IP>:3458/health
@@ -24,7 +24,7 @@ version: "3.8"
 
 services:
   mylife-finance-mcp:
-    image: mylife-finance-mcp:1.2.3
+    image: mylife-finance-mcp:1.2.4
     container_name: mylife-finance-mcp
     restart: unless-stopped
     environment:

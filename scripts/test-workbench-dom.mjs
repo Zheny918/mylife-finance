@@ -14,7 +14,7 @@
  * 配置，然后在 vm 里跑整段脚本，断言：
  *   1. 初始化不抛错，首页三张图（趋势 + 两张饼图）都建出来，趋势是 bar/bar/line 混合；
  *   2. 逐一点击每个导航 tab 都不抛错；
- *   3. 报表页 6 张图都建出来，饼图数据来自 /api/reports/overview；
+ *   3. 报表页 10 张图都建出来（分类 2 + 四个维度各拆收入/支出），饼图数据来自 /api/reports/overview；
  *   4. 年份筛选真的进了查询串、二级分类会回填一级分类；
  *   5. 脚本里 getElementById 的每个 id 在 HTML 里都存在（防手滑改名）。
  *
@@ -118,7 +118,11 @@ function makeEl(tag = 'div') {
 }
 
 const registry = new Map();
-for (const id of [...HTML.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1])) registry.set(id, makeEl());
+for (const id of [...HTML.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1])) {
+  const el = makeEl();
+  el.id = id;            // 浏览器里每个元素都有 .id，图表断言要按 id 认领
+  registry.set(id, el);
+}
 const $ = (id) => registry.get(id) || null;
 
 const navButtons = [...HTML.matchAll(/data-tab="([^"]+)"/g)].map((m) => {
@@ -287,11 +291,25 @@ await tick();
 ok('所有 tab 全部可切换且不抛错', tabErrors.length === 0, tabErrors.join(' | ') || `${navButtons.length} 个入口`);
 ok('切换时请求过 /api/selectors', calls.some((u) => u.startsWith('/api/selectors')));
 ok('切换时请求过 /api/reports/overview', calls.some((u) => u.startsWith('/api/reports/overview')));
-ok('报表页 6 张饼图都建出来', charts.length >= 3 + 6, '累计 ' + charts.length + ' 张');
-const repKinds = charts.slice(-6).map((c) => c.config.type);
+ok('报表页 10 张饼图都建出来', charts.length >= 3 + 10, '累计 ' + charts.length + ' 张');
+const repOnly = charts.slice(-10);
+const repKinds = repOnly.map((c) => c.config.type);
 ok('报表图全部是 doughnut', repKinds.every((t) => t === 'doughnut'), repKinds.join(','));
-const repData = charts[charts.length - 1].config.data.datasets[0].data;
-ok('报表饼图带上了接口数据', Array.isArray(repData) && repData[0] === 212, JSON.stringify(repData));
+const REP_IDS = ['repIncome', 'repExpense', 'repAccountIncome', 'repAccountExpense', 'repMemberIncome',
+  'repMemberExpense', 'repMerchantIncome', 'repMerchantExpense', 'repProjectIncome', 'repProjectExpense'];
+const repById = {};
+repOnly.forEach((c) => { const id = c.ctx && c.ctx.id; if (id) repById[id] = c; });
+ok('十张图的 canvas id 一个不缺', REP_IDS.every((id) => repById[id]), REP_IDS.filter((id) => !repById[id]).join(',') || '全部到位');
+const repData = (id) => (repById[id] ? repById[id].config.data.datasets[0].data : null);
+const repLabel = (id) => (repById[id] ? repById[id].config.data.labels[0] : null);
+ok('账户收入图按 income 取数', JSON.stringify(repData('repAccountIncome')) === '[800]', JSON.stringify(repData('repAccountIncome')));
+ok('账户支出图按 expense 取数', JSON.stringify(repData('repAccountExpense')) === '[300]', JSON.stringify(repData('repAccountExpense')));
+ok('成员收入为 0 时画灰饼占位', JSON.stringify(repData('repMemberIncome')) === '[1]' && repLabel('repMemberIncome') === '所选条件下无成员收入', repLabel('repMemberIncome'));
+ok('成员支出图按 expense 取数', JSON.stringify(repData('repMemberExpense')) === '[300]', JSON.stringify(repData('repMemberExpense')));
+ok('商家支出图按 expense 取数', JSON.stringify(repData('repMerchantExpense')) === '[88]', JSON.stringify(repData('repMerchantExpense')));
+ok('项目支出图按 expense 取数', JSON.stringify(repData('repProjectExpense')) === '[212]', JSON.stringify(repData('repProjectExpense')));
+ok('项目收入为 0 时文案带维度名', repLabel('repProjectIncome') === '所选条件下无项目收入', repLabel('repProjectIncome'));
+ok('四个维度都拆成收入/支出两张（不再有「账户收支」合并图）', !HTML.includes('<h3>账户收支</h3>') && !HTML.includes('<h3>项目收支</h3>'));
 
 console.log('\n=== 查询条件联动 ===');
 // 年份 → 查询串
@@ -367,13 +385,18 @@ console.log('\n=== 日期区间控件 ===');
 console.log('\n=== 报表口径 ===');
 {
   ok('报表不再有「饼图口径」下拉', !HTML.includes('id="rpBasis"'));
-  // 类型=仅支出 ⇒ 四张维度图按 expense 取值（账户维度 income 800 / expense 300 / amount 1100）
+  // 类型=仅支出：收入图 / 支出图各自口径固定，不再跟着「类型」换算法；类型只负责过滤数据
   $('rpType').value = 'EXPENSE';
   charts.length = 0;
   $('rpType').fire('change');
   await tick();
-  const accountData = charts[2] && charts[2].config.data.datasets[0].data;
-  ok('类型改「仅支出」后维度图按支出取值', Array.isArray(accountData) && accountData[0] === 300, JSON.stringify(accountData));
+  const expC = charts.find((c) => c.ctx && c.ctx.id === 'repAccountExpense');
+  const incC = charts.find((c) => c.ctx && c.ctx.id === 'repAccountIncome');
+  ok('类型改「仅支出」后账户支出图仍按 expense 取数',
+    !!expC && JSON.stringify(expC.config.data.datasets[0].data) === '[300]', expC && JSON.stringify(expC.config.data.datasets[0].data));
+  ok('同一维度的收入图口径不受「类型」影响',
+    !!incC && JSON.stringify(incC.config.data.datasets[0].data) === '[800]', incC && JSON.stringify(incC.config.data.datasets[0].data));
+  ok('「类型」仍然作为过滤条件进查询串', calls.some((u) => u.includes('type=EXPENSE')), calls.filter((u) => u.includes('/api/reports/overview')).slice(-1)[0]);
   $('rpType').value = '';
   $('rpType').fire('change');
   await tick();

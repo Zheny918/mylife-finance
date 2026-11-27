@@ -1,6 +1,6 @@
 {
   "name": "mylife-finance-skill",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Standalone finance bookkeeping MCP server (stdio + streamable HTTP) with WorkBuddy/Octop skill",
   "main": "server.js",
   "type": "commonjs",
@@ -17,7 +17,7 @@
     "test:api": "node scripts/test-api-import.mjs",
     "make:templates": "node scripts/make-import-templates.mjs",
     "reset:data": "node scripts/reset-data.mjs",
-    "docker:build": "docker build -t mylife-finance-mcp:1.2.3 .",
+    "docker:build": "docker build -t mylife-finance-mcp:1.2.4 .",
     "docker:verify": "node scripts/docker-build-verify.mjs",
     "image:tar": "node scripts/build-image-tar.mjs",
     "image:tar:gz": "node scripts/build-image-tar.mjs --gzip",

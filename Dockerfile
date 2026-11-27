@@ -3,7 +3,7 @@
 # Finance MCP Server — 容器镜像
 # 给 Octop（Docker 部署）用的 streamable HTTP MCP 服务。
 #
-# 构建：docker build -t mylife-finance-mcp:1.2.3 .
+# 构建：docker build -t mylife-finance-mcp:1.2.4 .
 # 运行：见 docker-compose.mylife-finance.yml
 # 一条命令构建 + 全量验收：node scripts/docker-build-verify.mjs
 #

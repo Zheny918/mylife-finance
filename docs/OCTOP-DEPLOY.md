@@ -3,12 +3,13 @@
 面向 **Docker 部署 + 家庭/团队多人**：两件套怎么装、连接器怎么填、用户怎么隔离、出问题怎么查。
 单机自用可以跳过容器，直接看 [§7](#7-单机自用stdio)。
 
-> **当前 v1.2.3**。三件套都在 `dist/`：`*.tar` / `*.tar.gz`（镜像）+ `mylife-finance-skill-*.zip`（技能）。
+> **当前 v1.2.4**。三件套都在 `dist/`：`*.tar` / `*.tar.gz`（镜像）+ `mylife-finance-skill-*.zip`（技能）。
 > 精简前的完整版文档存档在 [`docs/archive/OCTOP-DEPLOY-v1.2.2-original.md`](archive/OCTOP-DEPLOY-v1.2.2-original.md)。
 
 | 版本 | 变更 | 升级动作 |
 |---|---|---|
-| **1.2.3** | 收支明细分页（默认 20 条/页，可选 20/50/100/200/500/1000）+ 本页/全部两行合计；报表默认今年；分类一级折叠并带底色 | 换镜像重建，`/data` 不动 |
+| **1.2.4** | 报表页拆分：账户 / 成员 / 商家 / 项目 四个维度各拆成「收入统计」「支出统计」两张饼图（共 10 张），每张口径固定 | 换镜像重建，`/data` 不动 |
+| 1.2.3 | 收支明细分页（默认 20 条/页，可选 20/50/100/200/500/1000）+ 本页/全部两行合计；报表默认今年；分类一级折叠并带底色 | 换镜像重建，`/data` 不动 |
 | 1.2.2 | 分类名同类型下全局唯一（应用层拦截 + 导入归一 + `UNIQUE(user_id,type,name)` 兜底）；老库有重名时只告警不建索引，合并后重启自动补 | 换镜像重建，`/data` 不动 |
 | 1.2.1 | 界面调整：本月交易拆发生/目标账户、报表去掉冗余的「饼图口径」、导航定序、明细年份默认本年 + 日期区间控件、分类左右并排 | 同上，接口只多一个 `categoryParent` |
 | 1.2.0 | 首页重做（累计天数/明细数、本月收支、混合趋势图）、账户卡号备注与余额调整流水、年份下拉与一二级分类联动、报表六饼图（新增 `report_overview`） | 同上，只 `ALTER TABLE ADD COLUMN` |
@@ -111,7 +112,7 @@ OCTOP_NETWORK=octop_default \
 curl -s http://127.0.0.1:3458/health                    # 3) 验证
 ```
 
-镜像标签与 `package.json` 一致（当前 `mylife-finance-mcp:1.2.3`），可用 `MYLF_IMAGE` 覆盖。`/health` 正常返回：
+镜像标签与 `package.json` 一致（当前 `mylife-finance-mcp:1.2.4`），可用 `MYLF_IMAGE` 覆盖。`/health` 正常返回：
 
 ```json
 {"ok":true,"transport":"streamable-http","toolCount":43,"dataDir":"/data","categories":137}
@@ -129,7 +130,7 @@ curl -s http://127.0.0.1:3458/health                    # 3) 验证
 | **`docker-compose.standalone.yml`** | **只要有镜像** | 不用 | 独立 bridge + 发布 3458 | QNAP / 群晖 / 任意 Linux |
 | 粘进 Octop 自己的 compose | Octop 同机 | 可选 | 自动同网络 | 想省事 |
 
-**QNAP Container Station**：① 先在「映像」里确认 `mylife-finance-mcp:1.2.3` 在列（名字来自 tar 里 `manifest.json` 的 `RepoTags`；显示 `<none>` 就 `docker tag <ID> mylife-finance-mcp:1.2.3`）；②「应用程序 → 创建 → Docker Compose」；③ 整段粘入 standalone，只改两处：`image:` 实际名字、`MYLF_HTTP_TOKEN:`（**端口对局域网开放就必须设**，Octop 连接器 Headers 填同一个值）；④ 部署后容器「运行中」；⑤ `curl -s http://<NAS_IP>:3458/health`。
+**QNAP Container Station**：① 先在「映像」里确认 `mylife-finance-mcp:1.2.4` 在列（名字来自 tar 里 `manifest.json` 的 `RepoTags`；显示 `<none>` 就 `docker tag <ID> mylife-finance-mcp:1.2.4`）；②「应用程序 → 创建 → Docker Compose」；③ 整段粘入 standalone，只改两处：`image:` 实际名字、`MYLF_HTTP_TOKEN:`（**端口对局域网开放就必须设**，Octop 连接器 Headers 填同一个值）；④ 部署后容器「运行中」；⑤ `curl -s http://<NAS_IP>:3458/health`。
 
 **SSH / 任意 Linux**：
 
@@ -242,10 +243,10 @@ Docker 部署时 `~/.octop` 在容器里：
 
 ```bash
 docker exec -it <octop容器> sh
-unzip -o mylife-finance-skill-1.2.3.zip -d /data/.octop/agents/main/skills/
+unzip -o mylife-finance-skill-1.2.4.zip -d /data/.octop/agents/main/skills/
 ```
 
-也可在控制台「技能包」页直接上传 `dist/mylife-finance-skill-1.2.3.zip`。落盘结构：`skills/mylife-finance/{SKILL.md,references/tools.md}`。
+也可在控制台「技能包」页直接上传 `dist/mylife-finance-skill-1.2.4.zip`。落盘结构：`skills/mylife-finance/{SKILL.md,references/tools.md}`。
 
 ---
 
@@ -311,7 +312,7 @@ MCP 与工作台**共用 3458**，不用起第二个进程、不用额外端口�
 |---|---|
 | **首页** | 八张卡片：本年收入/支出/结余 + 累计记账天数 + 累计明细数 + 本月收入/支出/结余。混合趋势图（收支双柱 + 结余折线）；两张饼图（本年/本月支出一级分类）；「本月交易」拆发生账户/目标账户、一级/二级分类 |
 | **收支明细** | 年份下拉默认本年（2024–2035）；日期区间控件（双月日历 + 左侧 9 个快捷区间 + 清空/确定），选非整年区间自动清空年份；类型/账户/人员/商家/项目/一二级分类筛选。列表**分页**：默认 20 条/页，可选 20/50/100/200/500/1000，底部有页码、跳页、总条数；合计**两行**——本页合计 + 全部合计（跨页按当前筛选求和）。表头吸顶、列表撑满视口 |
-| **报表** | 默认日期=**今年**（重置也回到今年）；一套筛选（类型/日期/账户/成员/商家/项目/说明）出六张饼图；后四张口径**由「类型」决定**（全部=收支合计、只看收入=收入、只看支出=支出），不再单设下拉。数据 `GET /api/reports/overview` / 工具 `report_overview` |
+| **报表** | 默认日期=**今年**（重置也回到今年）；一套筛选（类型/日期/账户/成员/商家/项目/说明）出**十张饼图**：收入类型、支出类型，账户/成员/商家/项目**每个维度拆成收入统计与支出统计两张**，口径固定不随「类型」变（类型只过滤数据）。数据 `GET /api/reports/overview` / 工具 `report_overview` |
 | **手工记账** | 类型·日期(到秒) → 账户·金额 → 一级·二级分类 → 成员·商家·项目·说明·标签；下拉按使用频次排序（`GET /api/selectors`） |
 | **应收应付** | 状态中文：待结清 / 部分结清 / 已结清 / 已逾期 |
 | **预算** | 按年月筛选；年/月两级，月预算嵌在年预算下；新增只列一级分类 |
@@ -619,7 +620,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST http://<主机IP>:3458/mcp/zhan
 | `url` 末段 | 决定看哪本账：同名=同一本，换名=新建空账 |
 | `headers` | 必须是**该用户自己的 token**；拿 A 的配 `zhang` 会 403 |
 | 保存后 | 还要在连接器列表**手动启用**，否则工具不加载 |
-| 技能层 | 另需把 `dist/mylife-finance-skill-1.2.3.zip` 解到该机 `~/.workbuddy/skills/mylife-finance/` |
+| 技能层 | 另需把 `dist/mylife-finance-skill-1.2.4.zip` 解到该机 `~/.workbuddy/skills/mylife-finance/` |
 
 客户端强制 URL 以 `/mcp` 结尾时用查询参数形式：`http://192.168.1.20:3458/mcp?user=zhang`（已实测等价）。
 
@@ -657,7 +658,7 @@ docker restart mylife-finance-mcp && curl -s http://127.0.0.1:3458/health
 ```bash
 node scripts/build-image-tar.mjs --gzip                  # → dist/*.tar + *.tar.gz
 node scripts/build-image-tar.mjs --registry https://docker.1ms.run   # 换源
-node scripts/build-image-tar.mjs --tag mylife-finance-mcp:1.2.3 --platform linux/amd64
+node scripts/build-image-tar.mjs --tag mylife-finance-mcp:1.2.4 --platform linux/amd64
 node scripts/build-image-tar.mjs --format oci            # containerd / podman 用
 ```
 
@@ -679,17 +680,17 @@ node scripts/build-image-tar.mjs --format oci            # containerd / podman �
 **A. 有 SSH 的 Linux / NAS（最稳）**
 
 ```bash
-scp dist/mylife-finance-mcp_1.2.3-linux-amd64.tar.gz user@server:/tmp/
-docker load -i /tmp/mylife-finance-mcp_1.2.3-linux-amd64.tar.gz   # 期望 Loaded image: mylife-finance-mcp:1.2.3
-docker image inspect mylife-finance-mcp:1.2.3 --format '{{.Os}}/{{.Architecture}} {{.Config.Entrypoint}}'
+scp dist/mylife-finance-mcp_1.2.4-linux-amd64.tar.gz user@server:/tmp/
+docker load -i /tmp/mylife-finance-mcp_1.2.4-linux-amd64.tar.gz   # 期望 Loaded image: mylife-finance-mcp:1.2.4
+docker image inspect mylife-finance-mcp:1.2.4 --format '{{.Os}}/{{.Architecture}} {{.Config.Entrypoint}}'
 # 期望 linux/amd64 [/usr/local/bin/docker-entrypoint.sh]
 docker run -d --name mylife-finance-mcp -p 3458:3458 -v mylife-finance-data:/data \
   -e MYLF_PUBLIC_BASE_URL=http://192.168.130.8:3458 \
-  --restart unless-stopped mylife-finance-mcp:1.2.3
+  --restart unless-stopped mylife-finance-mcp:1.2.4
 curl -s http://127.0.0.1:3458/health
 ```
 
-**B. QNAP Container Station**：① SSH 里 `uname -m` 确认架构（`x86_64` 用 amd64 包；`aarch64` 需 `--platform linux/arm64` 重新生成）；②「映像 → 导入」选 `.tar`/`.tar.gz`；③ 列表出现 `mylife-finance-mcp:1.2.3`；④ 新建容器：端口 3458→3458、挂载到 `/data`、命令与入口**留空**、勾选自动重启；⑤ `curl http://<NAS_IP>:3458/health`。
+**B. QNAP Container Station**：① SSH 里 `uname -m` 确认架构（`x86_64` 用 amd64 包；`aarch64` 需 `--platform linux/arm64` 重新生成）；②「映像 → 导入」选 `.tar`/`.tar.gz`；③ 列表出现 `mylife-finance-mcp:1.2.4`；④ 新建容器：端口 3458→3458、挂载到 `/data`、命令与入口**留空**、勾选自动重启；⑤ `curl http://<NAS_IP>:3458/health`。
 
 > Container Station 仍报格式问题，说明它这版只认 `.tar`：改用 SSH + `docker load -i`（需先在「控制台 → 网络和文件服务」开 SSH）。接 Octop：`http://<NAS_IP>:3458/mcp/<userId>`，其余同 §5。
 
@@ -713,7 +714,7 @@ curl -s http://127.0.0.1:3458/health
 - **目标机必须是 Linux 容器模式**：Windows 切到 Windows containers 会报 `cannot load linux image on windows`。
 - **镜像内容**：不含 `workbench.js`（只跑 MCP）、`scripts/`、`docs/`、`fixtures/`。
 - **不含签名 / SBOM**，内部使用范畴。
-- **已做的验证（1.2.3）**：① 脚本结构校验（应用层 21 文件 + 7 目录、5 层 `diff_id` 逐层匹配、入口 755、无 gzip 层）；② 独立复核脚本从归档解出应用层，与工作区 **21 个文件逐字节 sha256 一致**（19 项检查全过）—— 证明包里的就是测过的代码；③ 把应用层解到磁盘直接 `node server-http.js`，跑 **215 项**测试全通过（`test-auth` 46 + `test-webapp-http` 31 + `test-accounts-v2` 42 + `e2e-octop-mcp` 27 + `test-workbench-v2` 69），覆盖登录、越权 403、强制改密、删号与同名重建、审计、按用户看板、MCP 握手与 **43 工具清单**、余额调整三路径、年份/分类筛选、**明细分页（page/pageSize/total/pages/sum）**、报表六维聚合、`categoryParent` 上卷、分类同名 11 条；④ `.tar.gz` 的 gzip 头与 ISIZE 校验。**首次 `docker load` 请留意输出**，报错把原文发我。
+- **已做的验证（1.2.4）**：① 脚本结构校验（应用层 21 文件 + 7 目录、5 层 `diff_id` 逐层匹配、入口 755、无 gzip 层）；② 独立复核脚本从归档解出应用层，与工作区 **21 个文件逐字节 sha256 一致**（19 项检查全过）—— 证明包里的就是测过的代码；③ 把应用层解到磁盘直接 `node server-http.js`，跑 **215 项**测试全通过（`test-auth` 46 + `test-webapp-http` 31 + `test-accounts-v2` 42 + `e2e-octop-mcp` 27 + `test-workbench-v2` 69），覆盖登录、越权 403、强制改密、删号与同名重建、审计、按用户看板、MCP 握手与 **43 工具清单**、余额调整三路径、年份/分类筛选、**明细分页（page/pageSize/total/pages/sum）**、报表六维聚合、`categoryParent` 上卷、分类同名 11 条；④ `.tar.gz` 的 gzip 头与 ISIZE 校验。**首次 `docker load` 请留意输出**，报错把原文发我。
 - **老库（1.2.1 及更早）升级的分类唯一索引**：库里已有同名不同父级分类时，启动只提示并跳过建索引（不崩、不影响使用），新增仍由应用层拦截；「分类管理 → 扫描重复」合并后重启即自动补上。该路径实机验证过（造 2 条历史重名 → 启动 → 拦截 → 合并 → 重启 → 索引生效）。
 
 复核搬运是否出错：
@@ -726,18 +727,18 @@ node scripts/verify-image-archive.mjs      # 默认查 dist/ 下当前版本的 
 
 ### 14.4 产物清单与校验值
 
-`dist/` 现保留 1.2.1 / 1.2.2 / 1.2.3 各三件，合计 **666 MB**（1.1.x 与 1.2.0 已清理）：
+`dist/` 现保留 1.2.2 / 1.2.3 / 1.2.4 各三件，合计 **666 MB**（1.1.x、1.2.0、1.2.1 已清理）：
 
 | 版本 | 产物 | 大小 | sha256 |
 |---|---|---|---|
-| **1.2.3** | `.tar` | 163.5 MB | `0b0545bf7ddb4d6be732ffb6142939d8c12c0a491bdc7df11b9554a20c43e3ca` |
-| **1.2.3** | `.tar.gz` | 58.5 MB | `761f5fd1d4342867eb3545888a3e715876c2a4f879d335ffb3d3faa5c574bb17` |
-| **1.2.3** | 技能 zip | 7.2 KB | `2a3896c618f9a1ae358efc06755e8d75442389ad51de25d7f5250d1de9a3e95c` |
+| **1.2.4** | `.tar` | 163.5 MB | `d1cdd7f4e2ecc590a7a80af2d2286fede722549b10b52d085b2d855bf2ec42a0` |
+| **1.2.4** | `.tar.gz` | 58.5 MB | `016e446f657f0ff83294c56f64d5a405ba997c55a29d44dc5d85b771bffa749c` |
+| **1.2.4** | 技能 zip | 7.3 KB | `bcfaf3ef9ea60320b3b70ced42f89053dd813d7f891d51fcacc0afd8b5235d9b` |
+| 1.2.3 | `.tar` | 163.5 MB | `0b0545bf7ddb4d6be732ffb6142939d8c12c0a491bdc7df11b9554a20c43e3ca` |
+| 1.2.3 | `.tar.gz` | 58.5 MB | `761f5fd1d4342867eb3545888a3e715876c2a4f879d335ffb3d3faa5c574bb17` |
+| 1.2.3 | 技能 zip | 7.2 KB | `2a3896c618f9a1ae358efc06755e8d75442389ad51de25d7f5250d1de9a3e95c` |
 | 1.2.2 | `.tar` | 163.5 MB | `3177e4a62a64926966fbfae7cc312b04b33753a5b53f774dcac7a7a68e69bc6e` |
 | 1.2.2 | `.tar.gz` | 58.4 MB | `e578f4bc09a86bb65011a92e63ecc75252e8a73108d5b45dece2cc35bfbf7c12` |
 | 1.2.2 | 技能 zip | 7.1 KB | `0e39fdb68e13dbc80b7c5b8d1d805d1fe3a2f235ff7a195a264fa0095dbbb1f7` |
-| 1.2.1 | `.tar` | 163.5 MB | `eed547b4c89efc30be1ca74c25343284465bcb1817670340078982771def3ed6` |
-| 1.2.1 | `.tar.gz` | 58.4 MB | `089a3a83dfdcbaadadddfd9b85ac7a9a1c29dd3d0fff4084643f11cec0a65c23` |
-| 1.2.1 | 技能 zip | 6.8 KB | `b41ac4989104dbef1a50bc76daecc569001f29494450a2daf6adf51767ccc41c` |
 
-搬运后复核：`sha256sum <文件>`，与本表对照。回滚就是 `docker load` 旧版 tar 后重建容器，**`/data` 不用动**（1.2.x 的库结构只增不破，旧版本会忽略新列）。唯一例外：1.2.2 建的分类唯一索引还在时，1.2.1（没有拦截逻辑）的「重复新增同名分类」会直接报 UNIQUE 错误，降级前请先备份并知悉这一点。
+搬运后复核：`sha256sum <文件>`，与本表对照。回滚就是 `docker load` 旧版 tar 后重建容器，**`/data` 不用动**（1.2.x 的库结构只增不破，旧版本会忽略新列）。唯一例外：1.2.2 建的分类唯一索引还在时，更早版本（1.2.0 / 1.2.1，没有应用层拦截）的「重复新增同名分类」会直接报 UNIQUE 错误，降级前请先备份并知悉这一点。

@@ -13,7 +13,7 @@
 #
 # 起之前确认镜像名（导入 tar 后可能被加成 <none>）：
 #   docker images | grep mylife
-# 若不是 mylife-finance-mcp:1.2.3，改下面 MCP 的 image: 一行。
+# 若不是 mylife-finance-mcp:1.2.4，改下面 MCP 的 image: 一行。
 #
 # 起来后逐层验证（顺序别跳）：
 #   curl -s http://127.0.0.1:3458/health                      # 宿主上：MCP 活着
@@ -55,7 +55,7 @@ services:
       - mylife_net
 
   mylife-finance-mcp:
-    image: mylife-finance-mcp:1.2.3
+    image: mylife-finance-mcp:1.2.4
     container_name: mylife-finance-mcp
     restart: unless-stopped
 
